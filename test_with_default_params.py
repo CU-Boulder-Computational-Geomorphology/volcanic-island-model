@@ -1,0 +1,1 @@
+from src.volcanic_island_simulator import VolcanicIslandSimulator
