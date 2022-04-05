@@ -23,6 +23,12 @@ _DEFAULT_GRID_PARAMS = {
     "spacing": 100.0,  # node spacing, m
 }
 
+_DEFAULT_CONE_PARAMS = {
+    "relief": 3500,  # number of node rows
+    "angle": 3,  # number of node columns
+
+}
+
 class VolcanicIslandSimulator:
     def __init__(self, params={}):
         """Initialize VolcanicIslandSimulator"""
@@ -46,27 +52,22 @@ class VolcanicIslandSimulator:
             xy_spacing=grid_params["spacing"],
         )
 
+        if "cone" in params:
+            cone_params = params["cone"]
+        else:
+            cone_params = _DEFAULT_CONE_PARAMS
+        relief = cone_params['relief']
+        angle = cone_params['angle']
+
         self.grid.set_closed_boundaries_at_grid_edges(True, True, True, True)
 
         # Set up initial topography...
         self.topo = self.grid.add_zeros("topographic__elevation", at="node")
-        # THE FOLLOWING IS JUST A PLACEHOLDER - REPLACE WITH CONE!
-        self.topo[:] = 0.1 * (
-            self.grid.x_of_node - 0.5 * np.amax(self.grid.x_of_node)
-        ) + 10.0 * np.random.rand(self.grid.number_of_nodes)
+        # define initial cone
+        self.topo[:] = make_volcano_topography(relief, angle,self.grid.x_of_node, self.grid.y_of_node)
 
         # ...and soil
         self.soil = self.grid.add_zeros("soil__depth", at="node")
-
-        self.sea_level = self.mg.add_zeros('sea_level__elevation', at='node')
-        self.soil_height = self.mg.add_zeros('soil__height', at='node')
-        ## set boundary conditions
-        self.mg.set_status_at_node_on_edges(
-            right=self.mg.BC_NODE_IS_CLOSED,
-            top=self.mg.BC_NODE_IS_CLOSED,
-            left=self.mg.BC_NODE_IS_CLOSED,
-            bottom=self.mg.BC_NODE_IS_CLOSED,
-            )
         # For each process/phenomenon, parse parameters, create field(s),
         # instantiate components, and perform other initialization
 
@@ -132,8 +133,8 @@ class VolcanicIslandSimulator:
     def plot_elevation(self):
         imshow_grid(self.mg, self.z)
         plt.show()
-        return
-def make_volcano_grid(relief, angle, spacing):
+        pass
+def make_volcano_topography(relief, angle, x, y):
     """
     Parameters
     ----------
@@ -143,27 +144,23 @@ def make_volcano_grid(relief, angle, spacing):
     angle: float
         average hillslope angle
 
-    spacing: float
-        distance between nodes
+    x: array
+        array of x locations
+
+    y: array
+        array of y locations
 
     Returns
     -------
-    mg: grid object
-        landlab raster model grid object
-
-    z: field object
-        model grid elevation field
+    topo: array
+        array of elevation at x,y
 
     """
-    from landlab import RasterModelGrid
 
-    slope = np.tan(np.deg2rad(angle))
-    mid = 2.0*relief/slope
-
-    num_rows = (mid*2.0+1.0)/spacing
-    mg = RasterModelGrid((num_rows, num_rows), xy_spacing = spacing)
-    dist = np.sqrt((mid - mg.x_of_node)**2+(mid - mg.y_of_node)**2)
+    slope = np.tan(np.pi*angle/180)
+    midx = np.mean(x)
+    midy = np.mean(y)
+    dist = np.sqrt((midx - x)**2+(midy - y)**2)
     topo = relief - slope*dist
-    z = mg.add_ones('topographic__elevation', at='node')*topo
 
-    return mg, z
+    return topo
