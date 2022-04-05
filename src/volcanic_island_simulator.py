@@ -9,6 +9,7 @@ import numpy as np
 from landlab import imshow_grid, RasterModelGrid
 from landlab.components import (
     PriorityFloodFlowRouter,
+    Space
 )
 
 
@@ -21,6 +22,23 @@ _DEFAULT_GRID_PARAMS = {
     "num_rows": 10,  # number of node rows
     "num_cols": 10,  # number of node columns
     "spacing": 100.0,  # node spacing, m
+}
+
+_DEFAULT_FLUVIAL_PARAMS = {
+    "grid": grid, # a grid
+    "K_sed": 0.002, # sediment erodibility
+    "K_br": 0.002, # bedrock erodibility
+    "F_f": 0.0 # fraction of fines
+    "phi": 0.3, # sediment porosity
+    "H_star": 0.1, # characteristic sediment thickness (roughness height)
+    "v_s": 1.0, # settling velocity
+    "m_sp": 0.5, # area exponent in stream power equation
+    "n_sp": 1.0, # slope exponent in stream power equation
+    "sp_crit_sed": 0.0, # threshold to erode sediment?
+    "sp_crit_br": 0.0 # threshold to erode bedrock?
+    # "discharge_field": 'surface_water__discharge', 
+    # "solver": 'basic', 
+    # "dt_min": 0.001
 }
 
 
@@ -80,6 +98,7 @@ class VolcanicIslandSimulator:
         )
 
         #   fluvial erosion, transport, deposition
+        self.space = Space(self.grid, **_DEFAULT_FLUVIAL_PARAMS)
 
         #   submarine sediment transport
 
@@ -108,6 +127,7 @@ class VolcanicIslandSimulator:
         self.flow_router.run_one_step()
 
         # Apply fluvial erosion, transport, and deposition
+        self.space.run_one_step()
 
         # Switch boundaries back to full grid
 
