@@ -85,8 +85,6 @@ class VolcanicIslandSimulator:
 
         #   submarine carbonate production
 
-        pass
-
     def update(self, dt):
         """Update simulation for one global time step of duration dt"""
 
