@@ -7,9 +7,7 @@ CU Boulder GEOL5702 group, Spring semester 2022.
 
 import numpy as np
 from landlab import imshow_grid, RasterModelGrid
-from landlab.components import (
-    PriorityFloodFlowRouter,
-)
+from landlab.components import PriorityFloodFlowRouter
 
 
 _DEFAULT_TIMING_PARAMS = {
@@ -24,10 +22,10 @@ _DEFAULT_GRID_PARAMS = {
 }
 
 _DEFAULT_CONE_PARAMS = {
-    "relief": 3500,  # number of node rows
-    "angle": 3,  # number of node columns
-
+    "relief": 3500,  # maximum cone elevation
+    "angle": 3,  # hillslope angle
 }
+
 
 class VolcanicIslandSimulator:
     def __init__(self, params={}):
@@ -56,15 +54,17 @@ class VolcanicIslandSimulator:
             cone_params = params["cone"]
         else:
             cone_params = _DEFAULT_CONE_PARAMS
-        relief = cone_params['relief']
-        angle = cone_params['angle']
+        relief = cone_params["relief"]
+        angle = cone_params["angle"]
 
         self.grid.set_closed_boundaries_at_grid_edges(True, True, True, True)
 
         # Set up initial topography...
         self.topo = self.grid.add_zeros("topographic__elevation", at="node")
         # define initial cone
-        self.topo[:] = make_volcano_topography(relief, angle,self.grid.x_of_node, self.grid.y_of_node)
+        self.topo[:] = make_volcano_topography(
+            relief, angle, self.grid.x_of_node, self.grid.y_of_node
+        )
 
         # ...and soil
         self.soil = self.grid.add_zeros("soil__depth", at="node")
@@ -128,10 +128,13 @@ class VolcanicIslandSimulator:
             self.update(min(self.dt, self.remaining_time))
             self.remaining_time -= self.dt
         pass
+
     def plot_elevation(self):
         imshow_grid(self.mg, self.z)
         plt.show()
         pass
+
+
 def make_volcano_topography(relief, angle, x, y):
     """
     Parameters
@@ -155,10 +158,10 @@ def make_volcano_topography(relief, angle, x, y):
 
     """
 
-    slope = np.tan(np.pi*angle/180)
+    slope = np.tan(np.pi * angle / 180)
     midx = np.mean(x)
     midy = np.mean(y)
-    dist = np.sqrt((midx - x)**2+(midy - y)**2)
-    topo = relief - slope*dist
+    dist = np.sqrt((midx - x) ** 2 + (midy - y) ** 2)
+    topo = relief - slope * dist
 
     return topo
