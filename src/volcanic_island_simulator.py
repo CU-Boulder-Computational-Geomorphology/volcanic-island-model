@@ -8,6 +8,7 @@ CU Boulder GEOL5702 group, Spring semester 2022.
 import numpy as np
 from landlab import imshow_grid, RasterModelGrid
 from landlab.components import PriorityFloodFlowRouter
+from landlab.components import Space
 
 
 _DEFAULT_TIMING_PARAMS = {
@@ -31,6 +32,22 @@ _DEFAULT_FLOW_PARAMS = {
     "surface": "topographic__elevation",
     "flow_metric": "D8",
     "update_flow_depressions": True,
+}
+
+_DEFAULT_SPACE_PARAMS = {
+    "K_sed": 0.002, # sediment erodibility
+    "K_br": 0.002, # bedrock erodibility
+    "F_f": 0.0 # fraction of fines
+    "phi": 0.3, # sediment porosity
+    "H_star": 0.1, # characteristic sediment thickness (roughness height)
+    "v_s": 1.0, # settling velocity
+    "m_sp": 0.5, # area exponent in stream power equation
+    "n_sp": 1.0, # slope exponent in stream power equation
+    "sp_crit_sed": 0.0, # threshold to erode sediment?
+    "sp_crit_br": 0.0 # threshold to erode bedrock?
+    "discharge_field": 'surface_water__discharge', 
+    "solver": 'basic', 
+    "dt_min": 0.001
 }
 
 
@@ -99,6 +116,13 @@ class VolcanicIslandSimulator:
         self.flow_router = PriorityFloodFlowRouter(self.grid, **flow_params)
 
         #   fluvial erosion, transport, deposition
+        if 'space' in params:
+            space_params = params['space']
+            
+        else:
+            space_params = _DEFAULT_SPACE_PARAMS
+            
+        self.space = Space(self.grid, **space_params)
 
         #   submarine sediment transport
 
@@ -125,6 +149,7 @@ class VolcanicIslandSimulator:
         self.flow_router.run_one_step()
 
         # Apply fluvial erosion, transport, and deposition
+        self.space.run_one_step()
 
         # Switch boundaries back to full grid
 
