@@ -27,6 +27,12 @@ _DEFAULT_CONE_PARAMS = {
     "noise": 1.0,  # amplitude of random noise, m
 }
 
+_DEFAULT_FLOW_PARAMS = {
+    "surface": "topographic__elevation",
+    "flow_metric": "D8",
+    "update_flow_depressions": True,
+}
+
 
 class VolcanicIslandSimulator:
     def __init__(self, params={}):
@@ -86,9 +92,11 @@ class VolcanicIslandSimulator:
         #   precipitation
 
         #   flow routing
-        self.flow_router = PriorityFloodFlowRouter(
-            self.grid, flow_metric="D8", update_flow_depressions=True
-        )
+        if "flow" in params:
+            flow_params = params["flow"]
+        else:
+            flow_params = _DEFAULT_FLOW_PARAMS
+        self.flow_router = PriorityFloodFlowRouter(self.grid, **flow_params)
 
         #   fluvial erosion, transport, deposition
 
