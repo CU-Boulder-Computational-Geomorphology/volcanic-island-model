@@ -37,17 +37,17 @@ _DEFAULT_FLOW_PARAMS = {
 _DEFAULT_SPACE_PARAMS = {
     "K_sed": 0.002, # sediment erodibility
     "K_br": 0.002, # bedrock erodibility
-    "F_f": 0.0 # fraction of fines
+    "F_f": 0.0, # fraction of fines
     "phi": 0.3, # sediment porosity
     "H_star": 0.1, # characteristic sediment thickness (roughness height)
     "v_s": 1.0, # settling velocity
     "m_sp": 0.5, # area exponent in stream power equation
     "n_sp": 1.0, # slope exponent in stream power equation
     "sp_crit_sed": 0.0, # threshold to erode sediment?
-    "sp_crit_br": 0.0 # threshold to erode bedrock?
+    "sp_crit_br": 0.0, # threshold to erode bedrock?
     "discharge_field": 'surface_water__discharge', 
     "solver": 'basic', 
-    "dt_min": 0.001
+    "dt_min": 0.001,
 }
 
 
