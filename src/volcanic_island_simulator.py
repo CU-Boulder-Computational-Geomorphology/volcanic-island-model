@@ -22,8 +22,15 @@ _DEFAULT_GRID_PARAMS = {
 }
 
 _DEFAULT_CONE_PARAMS = {
-    "relief": 3500,  # maximum cone elevation
-    "angle": 3,  # hillslope angle
+    "relief": 3500,  # maximum cone elevation, m
+    "angle": 3,  # hillslope angle, degrees
+    "noise": 1.0,  # amplitude of random noise, m
+}
+
+_DEFAULT_FLOW_PARAMS = {
+    "surface": "topographic__elevation",
+    "flow_metric": "D8",
+    "update_flow_depressions": True,
 }
 
 
@@ -56,6 +63,7 @@ class VolcanicIslandSimulator:
             cone_params = _DEFAULT_CONE_PARAMS
         relief = cone_params["relief"]
         angle = cone_params["angle"]
+        noise = cone_params["noise"]
 
         self.grid.set_closed_boundaries_at_grid_edges(True, True, True, True)
 
@@ -63,7 +71,7 @@ class VolcanicIslandSimulator:
         self.topo = self.grid.add_zeros("topographic__elevation", at="node")
         # define initial cone
         self.topo[:] = make_volcano_topography(
-            relief, angle, self.grid.x_of_node, self.grid.y_of_node
+            relief, angle, self.grid.x_of_node, self.grid.y_of_node, noise
         )
 
         # ...and soil
@@ -84,9 +92,11 @@ class VolcanicIslandSimulator:
         #   precipitation
 
         #   flow routing
-        self.flow_router = PriorityFloodFlowRouter(
-            self.grid, flow_metric="D8", update_flow_depressions=True
-        )
+        if "flow" in params:
+            flow_params = params["flow"]
+        else:
+            flow_params = _DEFAULT_FLOW_PARAMS
+        self.flow_router = PriorityFloodFlowRouter(self.grid, **flow_params)
 
         #   fluvial erosion, transport, deposition
 
@@ -135,7 +145,7 @@ class VolcanicIslandSimulator:
         pass
 
 
-def make_volcano_topography(relief, angle, x, y):
+def make_volcano_topography(relief, angle, x, y, noise=0.0):
     """
     Parameters
     ----------
@@ -151,6 +161,9 @@ def make_volcano_topography(relief, angle, x, y):
     y: array
         array of y locations
 
+    noise: float
+        amplitude of random noise added to topography, m
+
     Returns
     -------
     topo: array
@@ -163,5 +176,6 @@ def make_volcano_topography(relief, angle, x, y):
     midy = np.mean(y)
     dist = np.sqrt((midx - x) ** 2 + (midy - y) ** 2)
     topo = relief - slope * dist
+    topo += noise * np.random.rand(len(topo))
 
     return topo
