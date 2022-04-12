@@ -24,8 +24,7 @@ _DEFAULT_GRID_PARAMS = {
     "spacing": 100.0,  # node spacing, m
 }
 
-_DEFAULT_FLUVIAL_PARAMS = {
-    "grid": grid, # a grid
+_DEFAULT_SPACE_PARAMS = {
     "K_sed": 0.002, # sediment erodibility
     "K_br": 0.002, # bedrock erodibility
     "F_f": 0.0 # fraction of fines
@@ -36,9 +35,9 @@ _DEFAULT_FLUVIAL_PARAMS = {
     "n_sp": 1.0, # slope exponent in stream power equation
     "sp_crit_sed": 0.0, # threshold to erode sediment?
     "sp_crit_br": 0.0 # threshold to erode bedrock?
-    # "discharge_field": 'surface_water__discharge', 
-    # "solver": 'basic', 
-    # "dt_min": 0.001
+    "discharge_field": 'surface_water__discharge', 
+    "solver": 'basic', 
+    "dt_min": 0.001
 }
 
 
@@ -98,7 +97,13 @@ class VolcanicIslandSimulator:
         )
 
         #   fluvial erosion, transport, deposition
-        self.space = Space(self.grid, **_DEFAULT_FLUVIAL_PARAMS)
+        if 'space' in params:
+            space_params = params['space']
+            
+        else:
+            space_params = _DEFAULT_SPACE_PARAMS
+            
+        self.space = Space(self.grid, **space_params)
 
         #   submarine sediment transport
 
