@@ -7,9 +7,9 @@ CU Boulder GEOL5702 group, Spring semester 2022.
 
 import numpy as np
 from landlab import imshow_grid, RasterModelGrid
-from landlab.components import (
-    PriorityFloodFlowRouter,
-)
+from landlab.components import PriorityFloodFlowRouter
+from landlab.components import Space
+from landlab.components import SimpleSubmarineDiffuser
 
 
 _DEFAULT_TIMING_PARAMS = {
@@ -21,6 +21,40 @@ _DEFAULT_GRID_PARAMS = {
     "num_rows": 10,  # number of node rows
     "num_cols": 10,  # number of node columns
     "spacing": 100.0,  # node spacing, m
+}
+
+_DEFAULT_CONE_PARAMS = {
+    "relief": 3500,  # maximum cone elevation, m
+    "angle": 3,  # hillslope angle, degrees
+    "noise": 1.0,  # amplitude of random noise, m
+}
+
+_DEFAULT_FLOW_PARAMS = {
+    "surface": "topographic__elevation",
+    "flow_metric": "D8",
+    "update_flow_depressions": True,
+}
+
+_DEFAULT_SPACE_PARAMS = {
+    "K_sed": 0.002, # sediment erodibility
+    "K_br": 0.002, # bedrock erodibility
+    "F_f": 0.0, # fraction of fines
+    "phi": 0.3, # sediment porosity
+    "H_star": 0.1, # characteristic sediment thickness (roughness height)
+    "v_s": 1.0, # settling velocity
+    "m_sp": 0.5, # area exponent in stream power equation
+    "n_sp": 1.0, # slope exponent in stream power equation
+    "sp_crit_sed": 0.0, # threshold to erode sediment?
+    "sp_crit_br": 0.0, # threshold to erode bedrock?
+    "discharge_field": 'surface_water__discharge', 
+    "solver": 'basic', 
+    "dt_min": 0.001,
+}
+
+_DEFAULT_MARINE_PARAMS = {
+    "sea_level": 0.0,  # water surface height
+    "wave_base": 1.0,  # depth to wave base
+    "shallow_water_diffusivity": 1.0,  # in m2/yr (this is very small)
 }
 
 
@@ -47,18 +81,25 @@ class VolcanicIslandSimulator:
             xy_spacing=grid_params["spacing"],
         )
 
+        if "cone" in params:
+            cone_params = params["cone"]
+        else:
+            cone_params = _DEFAULT_CONE_PARAMS
+        relief = cone_params["relief"]
+        angle = cone_params["angle"]
+        noise = cone_params["noise"]
+
         self.grid.set_closed_boundaries_at_grid_edges(True, True, True, True)
 
         # Set up initial topography...
         self.topo = self.grid.add_zeros("topographic__elevation", at="node")
-        # THE FOLLOWING IS JUST A PLACEHOLDER - REPLACE WITH CONE!
-        self.topo[:] = 0.1 * (
-            self.grid.x_of_node - 0.5 * np.amax(self.grid.x_of_node)
-        ) + 10.0 * np.random.rand(self.grid.number_of_nodes)
+        # define initial cone
+        self.topo[:] = make_volcano_topography(
+            relief, angle, self.grid.x_of_node, self.grid.y_of_node, noise
+        )
 
         # ...and soil
         self.soil = self.grid.add_zeros("soil__depth", at="node")
-
         # For each process/phenomenon, parse parameters, create field(s),
         # instantiate components, and perform other initialization
 
@@ -75,13 +116,27 @@ class VolcanicIslandSimulator:
         #   precipitation
 
         #   flow routing
-        self.flow_router = PriorityFloodFlowRouter(
-            self.grid, flow_metric="D8", update_flow_depressions=True
-        )
+        if "flow" in params:
+            flow_params = params["flow"]
+        else:
+            flow_params = _DEFAULT_FLOW_PARAMS
+        self.flow_router = PriorityFloodFlowRouter(self.grid, **flow_params)
 
         #   fluvial erosion, transport, deposition
+        if 'space' in params:
+            space_params = params['space']
+            
+        else:
+            space_params = _DEFAULT_SPACE_PARAMS
+            
+        self.space = Space(self.grid, **space_params)
 
         #   submarine sediment transport
+        if "marine" in params:
+            marine_params = params["marine"]
+        else:
+            marine_params = _DEFAULT_MARINE_PARAMS
+        self.ssd = SimpleSubmarineDiffuser(self.grid, **marine_params)
 
         #   submarine carbonate production
 
@@ -106,10 +161,13 @@ class VolcanicIslandSimulator:
         self.flow_router.run_one_step()
 
         # Apply fluvial erosion, transport, and deposition
+        self.space.run_one_step()
 
         # Switch boundaries back to full grid
+        self.grid.status_at_node[under_water] = self.grid.BC_NODE_IS_CORE
 
         # Apply submarine sediment transport
+        self.ssd.run_one_step(dt)
 
         # Produce marine carbonate
 
@@ -118,3 +176,45 @@ class VolcanicIslandSimulator:
         while self.remaining_time > 0.0:
             self.update(min(self.dt, self.remaining_time))
             self.remaining_time -= self.dt
+        pass
+
+    def plot_elevation(self):
+        imshow_grid(self.mg, self.z)
+        plt.show()
+        pass
+
+
+def make_volcano_topography(relief, angle, x, y, noise=0.0):
+    """
+    Parameters
+    ----------
+    relief: float
+        height of initial volcano above datum
+
+    angle: float
+        average hillslope angle
+
+    x: array
+        array of x locations
+
+    y: array
+        array of y locations
+
+    noise: float
+        amplitude of random noise added to topography, m
+
+    Returns
+    -------
+    topo: array
+        array of elevation at x,y
+
+    """
+
+    slope = np.tan(np.pi * angle / 180)
+    midx = np.mean(x)
+    midy = np.mean(y)
+    dist = np.sqrt((midx - x) ** 2 + (midy - y) ** 2)
+    topo = relief - slope * dist
+    topo += noise * np.random.rand(len(topo))
+
+    return topo
