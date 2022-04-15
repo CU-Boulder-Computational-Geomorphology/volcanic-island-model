@@ -62,6 +62,8 @@ class VolcanicIslandSimulator:
             t_params = _DEFAULT_TIMING_PARAMS
         self.dt = t_params["timestep_size"]
         self.remaining_time = t_params["run_duration"]
+        self.update_interval = self.remaining_time / 20.0
+        self.next_update = self.remaining_time - self.update_interval
 
         # Create and configure grid
         if "grid" in params:
@@ -156,7 +158,15 @@ class VolcanicIslandSimulator:
 
         # Deposit incoming sediment at underwater nodes
         sea_node_areas = self.grid.area_of_cell[self.grid.cell_at_node[under_water]]
-        self.soil[under_water] += self.fluvial_sed_influx[under_water] / sea_node_areas
+        self.soil[under_water] += (
+            dt * self.fluvial_sed_influx[under_water] / sea_node_areas
+        )
+        print(
+            "Max depo",
+            np.amax(dt * self.fluvial_sed_influx[under_water] / sea_node_areas),
+        )
+        self.topo[:] = self.rock + self.soil
+        self.fluvial_sed_influx[:] = 0.0
 
         # Switch boundaries back to full grid
         self.grid.status_at_node[under_water] = self.grid.BC_NODE_IS_CORE
@@ -170,12 +180,13 @@ class VolcanicIslandSimulator:
         while self.remaining_time > 0.0:
             self.update(min(self.dt, self.remaining_time))
             self.remaining_time -= self.dt
-        pass
+            if self.remaining_time <= self.next_update:
+                print("Remaining time", self.remaining_time)
+                self.next_update -= self.update_interval
 
     def plot_elevation(self):
         imshow_grid(self.mg, self.z)
         plt.show()
-        pass
 
 
 def make_volcano_topography(relief, angle, x, y, noise=0.0):
