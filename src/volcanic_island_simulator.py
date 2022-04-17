@@ -9,6 +9,7 @@ import numpy as np
 from landlab import imshow_grid, RasterModelGrid
 from landlab.components import PriorityFloodFlowRouter
 from landlab.components import Space
+from landlab.components import SimpleSubmarineDiffuser
 
 
 _DEFAULT_TIMING_PARAMS = {
@@ -50,6 +51,11 @@ _DEFAULT_SPACE_PARAMS = {
     "dt_min": 0.001,
 }
 
+_DEFAULT_MARINE_PARAMS = {
+    "sea_level": 0.0,  # water surface height
+    "wave_base": 1.0,  # depth to wave base
+    "shallow_water_diffusivity": 1.0,  # in m2/yr (this is very small)
+}
 _DEFAULT_SEA_LEVEL_PARAMS = {
     "mean": 0,  # mean sea level elevation in m
     "period": 10000,  # length of one sea level cycle in years
@@ -135,6 +141,11 @@ class VolcanicIslandSimulator:
         self.space = Space(self.grid, **space_params)
 
         #   submarine sediment transport
+        if "marine" in params:
+            marine_params = params["marine"]
+        else:
+            marine_params = _DEFAULT_MARINE_PARAMS
+        self.ssd = SimpleSubmarineDiffuser(self.grid, **marine_params)
 
         #   submarine carbonate production
 
@@ -161,8 +172,10 @@ class VolcanicIslandSimulator:
         self.space.run_one_step()
 
         # Switch boundaries back to full grid
+        self.grid.status_at_node[under_water] = self.grid.BC_NODE_IS_CORE
 
         # Apply submarine sediment transport
+        self.ssd.run_one_step(dt)
 
         # Produce marine carbonate
 
