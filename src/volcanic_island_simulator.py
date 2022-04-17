@@ -35,19 +35,25 @@ _DEFAULT_FLOW_PARAMS = {
 }
 
 _DEFAULT_SPACE_PARAMS = {
-    "K_sed": 0.002, # sediment erodibility
-    "K_br": 0.002, # bedrock erodibility
-    "F_f": 0.0, # fraction of fines
-    "phi": 0.3, # sediment porosity
-    "H_star": 0.1, # characteristic sediment thickness (roughness height)
-    "v_s": 1.0, # settling velocity
-    "m_sp": 0.5, # area exponent in stream power equation
-    "n_sp": 1.0, # slope exponent in stream power equation
-    "sp_crit_sed": 0.0, # threshold to erode sediment?
-    "sp_crit_br": 0.0, # threshold to erode bedrock?
-    "discharge_field": 'surface_water__discharge', 
-    "solver": 'basic', 
+    "K_sed": 0.002,  # sediment erodibility
+    "K_br": 0.002,  # bedrock erodibility
+    "F_f": 0.0,  # fraction of fines
+    "phi": 0.3,  # sediment porosity
+    "H_star": 0.1,  # characteristic sediment thickness (roughness height)
+    "v_s": 1.0,  # settling velocity
+    "m_sp": 0.5,  # area exponent in stream power equation
+    "n_sp": 1.0,  # slope exponent in stream power equation
+    "sp_crit_sed": 0.0,  # threshold to erode sediment?
+    "sp_crit_br": 0.0,  # threshold to erode bedrock?
+    "discharge_field": "surface_water__discharge",
+    "solver": "basic",
     "dt_min": 0.001,
+}
+
+_DEFAULT_SEA_LEVEL_PARAMS = {
+    "mean": 0,  # mean sea level elevation in m
+    "period": 10000,  # length of one sea level cycle in years
+    "amplitude": 100,  # total change in sea level from its minimum to its maximum in m
 }
 
 
@@ -62,7 +68,7 @@ class VolcanicIslandSimulator:
             t_params = _DEFAULT_TIMING_PARAMS
         self.dt = t_params["timestep_size"]
         self.remaining_time = t_params["run_duration"]
-
+        self.final_time = t_params["run_duration"]
         # Create and configure grid
         if "grid" in params:
             grid_params = params["grid"]
@@ -78,9 +84,6 @@ class VolcanicIslandSimulator:
             cone_params = params["cone"]
         else:
             cone_params = _DEFAULT_CONE_PARAMS
-        relief = cone_params["relief"]
-        angle = cone_params["angle"]
-        noise = cone_params["noise"]
 
         self.grid.set_closed_boundaries_at_grid_edges(True, True, True, True)
 
@@ -88,7 +91,11 @@ class VolcanicIslandSimulator:
         self.topo = self.grid.add_zeros("topographic__elevation", at="node")
         # define initial cone
         self.topo[:] = make_volcano_topography(
-            relief, angle, self.grid.x_of_node, self.grid.y_of_node, noise
+            cone_params["relief"],
+            cone_params["angle"],
+            self.grid.x_of_node,
+            self.grid.y_of_node,
+            cone_params["noise"],
         )
 
         # ...and soil
@@ -98,9 +105,12 @@ class VolcanicIslandSimulator:
 
         #   sea level and/or tectonics
         if "sea_level" in params:
-            self.sea_level = params["sea_level"]
+            sea_level_params = params["sea_level"]
         else:
-            self.sea_level = 0.0
+            sea_level_params = _DEFAULT_SEA_LEVEL_PARAMS
+        self.sea_level_mean = sea_level_params["mean"]
+        self.sea_level_amplitude = sea_level_params["amplitude"]
+        self.sea_level_period = sea_level_params["period"]
 
         #   lithosphere flexure?
 
@@ -116,12 +126,12 @@ class VolcanicIslandSimulator:
         self.flow_router = PriorityFloodFlowRouter(self.grid, **flow_params)
 
         #   fluvial erosion, transport, deposition
-        if 'space' in params:
-            space_params = params['space']
-            
+        if "space" in params:
+            space_params = params["space"]
+
         else:
             space_params = _DEFAULT_SPACE_PARAMS
-            
+
         self.space = Space(self.grid, **space_params)
 
         #   submarine sediment transport
@@ -130,9 +140,8 @@ class VolcanicIslandSimulator:
 
     def update(self, dt):
         """Update simulation for one global time step of duration dt"""
-
         # Update tectonics and/or sea level
-
+        self.change_sea_level()
         # Set boundaries for subaerial processes: all interior submarine nodes
         # flagged as FIXED_VALUE
         under_water = np.logical_and(
@@ -160,13 +169,17 @@ class VolcanicIslandSimulator:
     def run(self):
         """Run simulation from start to finish"""
         while self.remaining_time > 0.0:
+
             self.update(min(self.dt, self.remaining_time))
             self.remaining_time -= self.dt
         pass
 
-    def plot_elevation(self):
-        imshow_grid(self.mg, self.z)
-        plt.show()
+    def change_sea_level(self):
+        """update sea level based on sinuosoidal cycle"""
+        time = self.final_time - self.remaining_time
+        self.sea_level = self.sea_level_mean + (self.sea_level_amplitude / 2) * np.sin(
+            2 * np.pi * time / (self.sea_level_period)
+        )
         pass
 
 
