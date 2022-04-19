@@ -8,6 +8,7 @@ email: kevin.rozmiarek@colorado.edu
 '''
 import scipy.stats as stats
 import os
+from math import e
 
 def file_gen(filename, years, mean, method, noise, option):
     """
@@ -81,6 +82,19 @@ def getPrecip():
                 STUFF
     '''
     
+    # Find height at each node
+    # Find temperature from generated file WRITE IMPORT SCRIPT
+    # Find wind for wind file NEED TO MAKE WIND FILE FOR SPACE
+    # Determine temperature as a function of lapse rate from surface temp
+    # Call condes to determine amount of water that falls
+    
+    # Needed data structures
+    # Condensded water per time step (precip)
+    # Surface temperature
+    # Wind
+    # Temp is from file and the same across the space
+    
+    
     precip = 0
     return precip
 
@@ -89,27 +103,32 @@ def getPrecip():
 #getPrecip utils
 
 def esat(T, a, b): #Saturated vapor pressure from Clausius-Clapeyron relationship
-    esat = 0
+    esat = 6.112*e((a*T)/(b+T))
     return esat
 
 def pz(z): #Pressure determined from lapse rate
-    pz = 0
+    p0 = 101325 #Pa
+    rho0 = 1.225 #kg*m-3
+    g = 9.81 #m*s-2
+    pz = p0*e(-(rho0*g*z)/p0)
     return pz
 
-def Tz(T0, gamma, z): #Temperature approximation by lapse rate
-    Tz = 0
+def Tz(T0, z): #Temperature approximation by lapse rate. Using dry adiabatic lapse rate from wiki
+    Tz = T0 - 0.0098*z
     return Tz
 
-def qsat(esat, p): #Saturation-specific humidity aka mass of saturated water vapor per unit mass of the parcel (Wallace & Hobbs 1977)
-    qsat = 0
+def qsat(T, z): #Saturation-specific humidity aka mass of saturated water vapor per unit mass of the parcel (Wallace & Hobbs 1977)
+    qsat = 0.622*(esat(T, 17.67, 243.5)/pz(z))
     return qsat
 
-def pqsat(p0, q0sat, z, a, b, gamma): #Mass of water vapor per unit volume in saturated air
-    pqsat = 0
-    return pqsat
+def pqsatdz(T, z): #Mass of water vapor per unit volume in saturated air
+    rho0 = 1.225 #kg*m-3
+    gamma = 4000 #m IN THE TRPOICS
+    pqsatdz = rho0*qsat(T,z)*e(z/gamma)*(1/gamma)
+    return pqsatdz
 
-def condes(w, pqsatdz): #Rate of condensation of water wapor
-    condes = 0
+def condes(w,T,z): #Rate of condensation of water wapor
+    condes = -w*pqsatdz(T,z)
     return condes
 
 ###############################################################################
