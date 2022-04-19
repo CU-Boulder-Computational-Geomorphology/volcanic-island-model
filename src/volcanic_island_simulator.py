@@ -57,6 +57,8 @@ _DEFAULT_MARINE_PARAMS = {
     "shallow_water_diffusivity": 1.0,  # in m2/yr (this is very small)
 }
 
+_DEFAULT_SEA_LEVEL_PARAMS = {"mean": 0, "amplitude": 100, "period": 10000}
+
 
 class VolcanicIslandSimulator:
     def __init__(self, params={}):
@@ -71,6 +73,7 @@ class VolcanicIslandSimulator:
         self.remaining_time = t_params["run_duration"]
         self.update_interval = self.remaining_time / 20.0
         self.next_update = self.remaining_time - self.update_interval
+        self.final_time = t_params["run_duration"]
 
         # Create and configure grid
         if "grid" in params:
@@ -109,10 +112,13 @@ class VolcanicIslandSimulator:
 
         #   sea level and/or tectonics
         if "sea_level" in params:
-            self.sea_level = params["sea_level"]
+            sea_level_params = params["sea_level"]
         else:
-            self.sea_level = 0.0
+            sea_level_params = _DEFAULT_SEA_LEVEL_PARAMS
 
+        self.sea_level_mean = sea_level_params["mean"]
+        self.sea_level_amplitude = sea_level_params["amplitude"]
+        self.sea_level_period = sea_level_params["period"]
         #   lithosphere flexure?
 
         #   hillslope weathering and transport
@@ -149,7 +155,7 @@ class VolcanicIslandSimulator:
         """Update simulation for one global time step of duration dt"""
 
         # Update tectonics and/or sea level
-
+        self.change_sea_level()
         # Set boundaries for subaerial processes: all interior submarine nodes
         # flagged as FIXED_VALUE
         under_water = np.logical_and(
@@ -200,6 +206,14 @@ class VolcanicIslandSimulator:
     def plot_elevation(self):
         imshow_grid(self.mg, self.z)
         plt.show()
+
+    def change_sea_level(self):
+        """update sea level based on sinuosoidal cycle"""
+        time = self.final_time - self.remaining_time
+        self.sea_level = self.sea_level_mean + (self.sea_level_amplitude / 2) * np.sin(
+            2 * np.pi * time / (self.sea_level_period)
+        )
+        pass
 
 
 def make_volcano_topography(relief, angle, x, y, noise=0.0):
