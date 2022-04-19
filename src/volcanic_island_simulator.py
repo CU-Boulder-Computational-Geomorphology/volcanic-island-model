@@ -163,6 +163,7 @@ class VolcanicIslandSimulator:
 
         # Update tectonics and/or sea level
         self.change_sea_level()
+        self.apply_tectonics(dt)
         # Set boundaries for subaerial processes: all interior submarine nodes
         # flagged as FIXED_VALUE
         under_water = np.logical_and(
