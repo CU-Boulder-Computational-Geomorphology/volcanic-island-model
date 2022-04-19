@@ -59,6 +59,8 @@ _DEFAULT_MARINE_PARAMS = {
 
 _DEFAULT_SEA_LEVEL_PARAMS = {"mean": 0, "amplitude": 100, "period": 10000}
 
+_DFAULT_TECTONIC_PARAMS = {"uplift": 0}  # m/yr of relative uplift (+) or subsidence (-)
+
 
 class VolcanicIslandSimulator:
     def __init__(self, params={}):
@@ -119,6 +121,11 @@ class VolcanicIslandSimulator:
         self.sea_level_mean = sea_level_params["mean"]
         self.sea_level_amplitude = sea_level_params["amplitude"]
         self.sea_level_period = sea_level_params["period"]
+
+        if "tectonics" in params:
+            self.uplift = params["tectonics"]["uplift"]
+        else:
+            self.uplift = _DFAULT_TECTONIC_PARAMS["uplift"]
         #   lithosphere flexure?
 
         #   hillslope weathering and transport
@@ -214,6 +221,11 @@ class VolcanicIslandSimulator:
             2 * np.pi * time / (self.sea_level_period)
         )
         pass
+
+    def apply_tectonics(self, dt):
+        """update base level based on simple releative uplift/subsidence rate
+        """
+        self.topo[:] += self.uplift * dt
 
 
 def make_volcano_topography(relief, angle, x, y, noise=0.0):
