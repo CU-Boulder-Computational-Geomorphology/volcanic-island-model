@@ -56,11 +56,6 @@ _DEFAULT_MARINE_PARAMS = {
     "wave_base": 1.0,  # depth to wave base
     "shallow_water_diffusivity": 1.0,  # in m2/yr (this is very small)
 }
-_DEFAULT_SEA_LEVEL_PARAMS = {
-    "mean": 0,  # mean sea level elevation in m
-    "period": 10000,  # length of one sea level cycle in years
-    "amplitude": 100,  # total change in sea level from its minimum to its maximum in m
-}
 
 
 class VolcanicIslandSimulator:
@@ -76,8 +71,8 @@ class VolcanicIslandSimulator:
         self.remaining_time = t_params["run_duration"]
         self.update_interval = self.remaining_time / 20.0
         self.next_update = self.remaining_time - self.update_interval
-
         self.final_time = t_params["run_duration"]
+
         # Create and configure grid
         if "grid" in params:
             grid_params = params["grid"]
@@ -93,6 +88,9 @@ class VolcanicIslandSimulator:
             cone_params = params["cone"]
         else:
             cone_params = _DEFAULT_CONE_PARAMS
+        relief = cone_params["relief"]
+        angle = cone_params["angle"]
+        noise = cone_params["noise"]
 
         self.grid.set_closed_boundaries_at_grid_edges(True, True, True, True)
 
@@ -100,11 +98,7 @@ class VolcanicIslandSimulator:
         self.topo = self.grid.add_zeros("topographic__elevation", at="node")
         # define initial cone
         self.topo[:] = make_volcano_topography(
-            cone_params["relief"],
-            cone_params["angle"],
-            self.grid.x_of_node,
-            self.grid.y_of_node,
-            cone_params["noise"],
+            relief, angle, self.grid.x_of_node, self.grid.y_of_node, noise
         )
 
         # ...and rock and soil
@@ -116,12 +110,9 @@ class VolcanicIslandSimulator:
 
         #   sea level and/or tectonics
         if "sea_level" in params:
-            sea_level_params = params["sea_level"]
+            self.sea_level = params["sea_level"]
         else:
-            sea_level_params = _DEFAULT_SEA_LEVEL_PARAMS
-        self.sea_level_mean = sea_level_params["mean"]
-        self.sea_level_amplitude = sea_level_params["amplitude"]
-        self.sea_level_period = sea_level_params["period"]
+            self.sea_level = 0.0
 
         #   lithosphere flexure?
 
@@ -157,8 +148,9 @@ class VolcanicIslandSimulator:
 
     def update(self, dt):
         """Update simulation for one global time step of duration dt"""
+
         # Update tectonics and/or sea level
-        self.change_sea_level()
+
         # Set boundaries for subaerial processes: all interior submarine nodes
         # flagged as FIXED_VALUE
         under_water = np.logical_and(
@@ -200,7 +192,6 @@ class VolcanicIslandSimulator:
     def run(self):
         """Run simulation from start to finish"""
         while self.remaining_time > 0.0:
-
             self.update(min(self.dt, self.remaining_time))
             self.remaining_time -= self.dt
             if self.remaining_time <= self.next_update:
