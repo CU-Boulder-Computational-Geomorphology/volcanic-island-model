@@ -36,8 +36,13 @@ _DEFAULT_FLOW_PARAMS = {
 }
 
 _DEFAULT_SPACE_PARAMS = {
+<<<<<<< HEAD
     "K_sed": 0.002,  # sediment erodibility
     "K_br": 0.002,  # bedrock erodibility
+=======
+    "K_sed": 0.01,  # sediment erodibility
+    "K_br": 0.0001,  # bedrock erodibility
+>>>>>>> 573b3c07f181ec4aecf9307cae56d931e9dff0f1
     "F_f": 0.0,  # fraction of fines
     "phi": 0.3,  # sediment porosity
     "H_star": 0.1,  # characteristic sediment thickness (roughness height)
@@ -74,7 +79,13 @@ class VolcanicIslandSimulator:
             t_params = _DEFAULT_TIMING_PARAMS
         self.dt = t_params["timestep_size"]
         self.remaining_time = t_params["run_duration"]
+<<<<<<< HEAD
         self.final_time = t_params["run_duration"]
+=======
+        self.update_interval = self.remaining_time / 20.0
+        self.next_update = self.remaining_time - self.update_interval
+
+>>>>>>> 573b3c07f181ec4aecf9307cae56d931e9dff0f1
         # Create and configure grid
         if "grid" in params:
             grid_params = params["grid"]
@@ -104,8 +115,10 @@ class VolcanicIslandSimulator:
             cone_params["noise"],
         )
 
-        # ...and soil
-        self.soil = self.grid.add_zeros("soil__depth", at="node")
+        # ...and rock and soil
+        self.rock = self.grid.add_zeros("bedrock__elevation", at="node")
+        self.soil = self.grid.add_zeros("soil__depth", at="node") + 0.01
+        self.rock[:] = self.topo - self.soil
         # For each process/phenomenon, parse parameters, create field(s),
         # instantiate components, and perform other initialization
 
@@ -139,6 +152,7 @@ class VolcanicIslandSimulator:
             space_params = _DEFAULT_SPACE_PARAMS
 
         self.space = Space(self.grid, **space_params)
+        self.fluvial_sed_influx = self.space.sediment_influx
 
         #   submarine sediment transport
         if "marine" in params:
@@ -171,6 +185,18 @@ class VolcanicIslandSimulator:
         # Apply fluvial erosion, transport, and deposition
         self.space.run_one_step()
 
+        # Deposit incoming sediment at underwater nodes
+        sea_node_areas = self.grid.area_of_cell[self.grid.cell_at_node[under_water]]
+        self.soil[under_water] += (
+            dt * self.fluvial_sed_influx[under_water] / sea_node_areas
+        )
+        print(
+            "Max depo",
+            np.amax(dt * self.fluvial_sed_influx[under_water] / sea_node_areas),
+        )
+        self.topo[:] = self.rock + self.soil
+        self.fluvial_sed_influx[:] = 0.0
+
         # Switch boundaries back to full grid
         self.grid.status_at_node[under_water] = self.grid.BC_NODE_IS_CORE
 
@@ -185,8 +211,11 @@ class VolcanicIslandSimulator:
 
             self.update(min(self.dt, self.remaining_time))
             self.remaining_time -= self.dt
-        pass
+            if self.remaining_time <= self.next_update:
+                print("Remaining time", self.remaining_time)
+                self.next_update -= self.update_interval
 
+<<<<<<< HEAD
     def change_sea_level(self):
         """update sea level based on sinuosoidal cycle"""
         time = self.final_time - self.remaining_time
@@ -194,6 +223,11 @@ class VolcanicIslandSimulator:
             2 * np.pi * time / (self.sea_level_period)
         )
         pass
+=======
+    def plot_elevation(self):
+        imshow_grid(self.mg, self.z)
+        plt.show()
+>>>>>>> 573b3c07f181ec4aecf9307cae56d931e9dff0f1
 
 
 def make_volcano_topography(relief, angle, x, y, noise=0.0):
