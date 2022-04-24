@@ -262,7 +262,7 @@ class VolcanicIslandSimulator:
                 print("Remaining time", self.remaining_time)
                 self.next_update -= self.update_interval
             if self.remaining_time <= self.next_output:
-                write_output()
+                self.write_output()
                 self.next_output -= self.output_interval
 
     def plot_elevation(self):
