@@ -10,6 +10,7 @@ from landlab import imshow_grid, RasterModelGrid
 from landlab.components import PriorityFloodFlowRouter
 from landlab.components import Space
 from landlab.components import SimpleSubmarineDiffuser
+from landlab.io.netcdf import write_netcdf
 
 
 _DEFAULT_TIMING_PARAMS = {
@@ -60,6 +61,33 @@ _DEFAULT_MARINE_PARAMS = {
 _DEFAULT_SEA_LEVEL_PARAMS = {"mean": 0, "amplitude": 100, "period": 10000}
 
 _DFAULT_TECTONIC_PARAMS = {"uplift": 0}  # m/yr of relative uplift (+) or subsidence (-)
+
+_DEFAULT_OUTPUT_PARAMS = {
+    "output_interval_fraction": 0.5,
+    "output_file_basename": "volcanic_island",
+}
+
+_OUTPUT_FIELDS = [
+    "topographic__elevation",
+    "bedrock__elevation",
+    "soil__depth",
+    "water__unit_flux_in",
+    "flow__link_to_receiver_node",
+    "drainage_area",
+    "flood_status_code",
+    "flow__upstream_node_order",
+    "flow__receiver_node",
+    "surface_water__discharge",
+    "topographic__steepest_slope",
+    "flow__receiver_proportions",
+    "depression_free_elevation",
+    "sediment__influx",
+    "sediment__outflux",
+    "sediment__flux",
+    "kd",
+    "sediment_deposit__thickness",
+    "water__depth",
+]
 
 
 class VolcanicIslandSimulator:
@@ -126,6 +154,7 @@ class VolcanicIslandSimulator:
             self.uplift = params["tectonics"]["uplift"]
         else:
             self.uplift = _DFAULT_TECTONIC_PARAMS["uplift"]
+
         #   lithosphere flexure?
 
         #   hillslope weathering and transport
@@ -158,6 +187,32 @@ class VolcanicIslandSimulator:
 
         #   submarine carbonate production
 
+        # Output parameters
+        if "output" in params:
+            out_params = params["output"]
+        else:
+            out_params = _DEFAULT_OUTPUT_PARAMS
+        self.output_file_basename = out_params["output_file_basename"]
+        self.output_interval = (
+            self.remaining_time * out_params["output_interval_fraction"]
+        )
+        self.next_output = self.remaining_time - self.output_interval
+        self.output_file_number = 0
+        self.num_outfile_zeros = 1 + int(
+            np.log10(self.remaining_time / max(self.output_interval, self.dt))
+        )
+        self.write_output()
+
+    def write_output(self):
+        """Write output to netcdf file."""
+        filename = (
+            self.output_file_basename
+            + str(self.output_file_number).zfill(self.num_outfile_zeros)
+            + ".nc"
+        )
+        write_netcdf(filename, self.grid, names=_OUTPUT_FIELDS)
+        self.output_file_number += 1
+
     def update(self, dt):
         """Update simulation for one global time step of duration dt"""
 
@@ -187,10 +242,6 @@ class VolcanicIslandSimulator:
         self.soil[under_water] += (
             dt * self.fluvial_sed_influx[under_water] / sea_node_areas
         )
-        print(
-            "Max depo",
-            np.amax(dt * self.fluvial_sed_influx[under_water] / sea_node_areas),
-        )
         self.topo[:] = self.rock + self.soil
         self.fluvial_sed_influx[:] = 0.0
 
@@ -210,6 +261,9 @@ class VolcanicIslandSimulator:
             if self.remaining_time <= self.next_update:
                 print("Remaining time", self.remaining_time)
                 self.next_update -= self.update_interval
+            if self.remaining_time <= self.next_output:
+                write_output()
+                self.next_output -= self.output_interval
 
     def plot_elevation(self):
         imshow_grid(self.mg, self.z)
@@ -224,8 +278,7 @@ class VolcanicIslandSimulator:
         pass
 
     def apply_tectonics(self, dt):
-        """update base level based on simple releative uplift/subsidence rate
-        """
+        """update base level based on simple releative uplift/subsidence rate"""
         self.topo[:] += self.uplift * dt
 
 
