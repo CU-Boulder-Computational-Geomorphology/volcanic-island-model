@@ -11,6 +11,7 @@ from landlab.components import PriorityFloodFlowRouter
 from landlab.components import Space
 from landlab.components import SimpleSubmarineDiffuser
 from landlab.io.netcdf import write_netcdf
+import precip as precrip
 
 
 _DEFAULT_TIMING_PARAMS = {
@@ -58,6 +59,13 @@ _DEFAULT_MARINE_PARAMS = {
     "shallow_water_diffusivity": 1.0,  # in m2/yr (this is very small)
 }
 
+_DEFAULT_PRECIP_PARAMS = {
+    "wind_": 1.0,    # vertical wind speed across island (m/s)
+    "surface_temp": 20,   # surface temperature for the domain (deg C)
+    "altitude": 0,   # reference to incoming moisture source (m)
+    "moisture_source_altitude": 400 # altitude in which moisture is coming in (m)
+}
+
 _DEFAULT_SEA_LEVEL_PARAMS = {"mean": 0, "amplitude": 100, "period": 10000}
 
 _DFAULT_TECTONIC_PARAMS = {"uplift": 0}  # m/yr of relative uplift (+) or subsidence (-)
@@ -87,6 +95,7 @@ _OUTPUT_FIELDS = [
     "kd",
     "sediment_deposit__thickness",
     "water__depth",
+    "precipitation",
 ]
 
 
@@ -101,6 +110,7 @@ class VolcanicIslandSimulator:
             t_params = _DEFAULT_TIMING_PARAMS
         self.dt = t_params["timestep_size"]
         self.remaining_time = t_params["run_duration"]
+        self.total_time = t_params["run_duration"]
         self.update_interval = self.remaining_time / 20.0
         self.next_update = self.remaining_time - self.update_interval
         self.final_time = t_params["run_duration"]
@@ -160,6 +170,11 @@ class VolcanicIslandSimulator:
         #   hillslope weathering and transport
 
         #   precipitation
+        if "precip" in params:
+            precip_params = params["precip"]
+        else:
+            precip_params = _DEFAULT_PRECIP_PARAMS
+        self.precipitation = self.grid.add_zeros("precipitation", at="node")
 
         #   flow routing
         if "flow" in params:
@@ -230,6 +245,7 @@ class VolcanicIslandSimulator:
         # Apply weathering and hillslope transport
 
         # Update precipitation
+        self.precipitation = precip.precip()
 
         # Update flow routing
         self.flow_router.run_one_step()

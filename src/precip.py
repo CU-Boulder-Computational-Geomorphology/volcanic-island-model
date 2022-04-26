@@ -31,7 +31,7 @@ def file_gen(filename, years, mean, method, noise, option):
                 -slope: The slope in change per year
 
     Returns:
-        A text file with temperature as a single column with one time step per row
+        -A text file with temperature as a single column with one time step per row
     """
     try:
         os.remove(filename)
@@ -71,31 +71,29 @@ def increase(number, slope, year): #Function the addes to a value an amount dete
 ###############################################################################
 
 
-def getPrecip():
+def getPrecip(wind_speed, temp, altitude, moisture_source_altitude):
     '''
     Description here
 
         Parameters:
-                STUFF
+                -wind_speed
+                    the vertical wind speed, simplified in Roe to be equal to the horizontal wind speed
+                -temp
+                -altitude
+                -moisture_source_altitude
 
         Returns:
-                STUFF
+                -A value for the mass of condensating water
     '''
     
     # Find height at each node
     # Find temperature from generated file WRITE IMPORT SCRIPT
     # Find wind for wind file NEED TO MAKE WIND FILE FOR SPACE
-    # Determine temperature as a function of lapse rate from surface temp
-    # Call condes to determine amount of water that falls
     
-    # Needed data structures
-    # Condensded water per time step (precip)
-    # Surface temperature
-    # Wind
-    # Temp is from file and the same across the space
+    z = moisture_source_altitude - altitude
+    t = Tz(temp, z)
     
-    
-    precip = 0
+    precip = condes(wind_speed, t, z)
     return precip
 
 ###############################################################################
@@ -127,7 +125,7 @@ def pqsatdz(T, z): #Mass of water vapor per unit volume in saturated air
     pqsatdz = rho0*qsat(T,z)*e(z/gamma)*(1/gamma)
     return pqsatdz
 
-def condes(w,T,z): #Rate of condensation of water wapor
+def condes(w, T, z): #Rate of condensation of water wapor
     condes = -w*pqsatdz(T,z)
     return condes
 
