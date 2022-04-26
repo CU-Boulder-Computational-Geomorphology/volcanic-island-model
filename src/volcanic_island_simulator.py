@@ -67,6 +67,7 @@ _DEFAULT_WEATHERING_PARAMS = {
     "soil_transport_decay_depth": 1.0,  # depth of soil in m
     "soil_production__maximum_rate": 0.001,  # soil conversion rate for bare rock in m/yr
     "soil_production__decay_depth": 2.0,  # characteristic weathering depth in m
+    "initial_soil_thickness": 1.0,
 }
 
 _DEFAULT_SEA_LEVEL_PARAMS = {"mean": 0, "amplitude": 100, "period": 10000}
@@ -146,7 +147,7 @@ class VolcanicIslandSimulator:
 
         # ...and rock and soil
         self.rock = self.grid.add_zeros("bedrock__elevation", at="node")
-        self.soil = self.grid.add_zeros("soil__depth", at="node") + 0.01
+        self.soil = self.grid.add_zeros("soil__depth", at="node")
         self.rock[:] = self.topo - self.soil
 
         # For each process/phenomenon, parse parameters, create field(s),
@@ -185,6 +186,7 @@ class VolcanicIslandSimulator:
             weathering_params = params["weathering"]
         else:
             weathering_params = _DEFAULT_WEATHERING_PARAMS
+        self.soil[:] = weathering_params["initial_soil_thickness"]
         self.weatherer = ExponentialWeatherer(
             self.grid,
             soil_production__maximum_rate=weathering_params[
