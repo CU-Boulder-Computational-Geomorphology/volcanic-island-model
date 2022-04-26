@@ -170,14 +170,15 @@ class VolcanicIslandSimulator:
         #   lithosphere flexure?
 
         #   hillslope weathering and transport
+        self.grid.add_zeros("soil_production__rate", at="node")
         if "diffusivity" in params:
             diffusion_params = params["diffusion"]
         else:
             diffusion_params = _DEFAULT_WEATHERING_PARAMS
         self.creeper = DepthDependentDiffuser(
-            grid,
-            linear_diffusivity=diffusion_params["diffusivity"],
-            soil_transport_decay_depth=diffusion_params["soil_decay"],
+            self.grid,
+            linear_diffusivity=diffusion_params["linear_diffusivity"],
+            soil_transport_decay_depth=diffusion_params["soil_transport_decay_depth"],
         )
 
         if "weathering" in params:
@@ -185,9 +186,13 @@ class VolcanicIslandSimulator:
         else:
             weathering_params = _DEFAULT_WEATHERING_PARAMS
         self.weatherer = ExponentialWeatherer(
-            grid,
-            soil_production__maximum_rate=weathering_params["production_max"],
-            soil_production__decay_depth=weathering_params["production_decay"],
+            self.grid,
+            soil_production__maximum_rate=weathering_params[
+                "soil_production__maximum_rate"
+            ],
+            soil_production__decay_depth=weathering_params[
+                "soil_production__decay_depth"
+            ],
         )
 
         #   precipitation
