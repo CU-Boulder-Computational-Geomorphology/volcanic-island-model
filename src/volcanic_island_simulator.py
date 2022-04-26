@@ -7,9 +7,13 @@ CU Boulder GEOL5702 group, Spring semester 2022.
 
 import numpy as np
 from landlab import imshow_grid, RasterModelGrid
-from landlab.components import PriorityFloodFlowRouter
-from landlab.components import Space
-from landlab.components import SimpleSubmarineDiffuser
+from landlab.components import (
+    PriorityFloodFlowRouter,
+    Space,
+    SimpleSubmarineDiffuser,
+    ExponentialWeatherer,
+    DepthDependentDiffuser,
+)
 from landlab.io.netcdf import write_netcdf
 
 
@@ -56,6 +60,14 @@ _DEFAULT_MARINE_PARAMS = {
     "sea_level": 0.0,  # water surface height
     "wave_base": 1.0,  # depth to wave base
     "shallow_water_diffusivity": 1.0,  # in m2/yr (this is very small)
+}
+
+_DEFAULT_WEATHERING_PARAMS = {
+    "linear_diffusivity": 0.001,  # diffusion coefficient in m^2/yr
+    "soil_transport_decay_depth": 1.0,  # depth of soil in m
+    "soil_production__maximum_rate": 0.001,  # soil conversion rate for bare rock in m/yr
+    "soil_production__decay_depth": 2.0,  # characteristic weathering depth in m
+    "initial_soil_thickness": 1.0,
 }
 
 _DEFAULT_SEA_LEVEL_PARAMS = {"mean": 0, "amplitude": 100, "period": 10000}
@@ -135,8 +147,9 @@ class VolcanicIslandSimulator:
 
         # ...and rock and soil
         self.rock = self.grid.add_zeros("bedrock__elevation", at="node")
-        self.soil = self.grid.add_zeros("soil__depth", at="node") + 0.01
+        self.soil = self.grid.add_zeros("soil__depth", at="node")
         self.rock[:] = self.topo - self.soil
+
         # For each process/phenomenon, parse parameters, create field(s),
         # instantiate components, and perform other initialization
 
@@ -158,6 +171,31 @@ class VolcanicIslandSimulator:
         #   lithosphere flexure?
 
         #   hillslope weathering and transport
+        self.grid.add_zeros("soil_production__rate", at="node")
+        if "diffusivity" in params:
+            diffusion_params = params["diffusion"]
+        else:
+            diffusion_params = _DEFAULT_WEATHERING_PARAMS
+        self.creeper = DepthDependentDiffuser(
+            self.grid,
+            linear_diffusivity=diffusion_params["linear_diffusivity"],
+            soil_transport_decay_depth=diffusion_params["soil_transport_decay_depth"],
+        )
+
+        if "weathering" in params:
+            weathering_params = params["weathering"]
+        else:
+            weathering_params = _DEFAULT_WEATHERING_PARAMS
+        self.soil[:] = weathering_params["initial_soil_thickness"]
+        self.weatherer = ExponentialWeatherer(
+            self.grid,
+            soil_production__maximum_rate=weathering_params[
+                "soil_production__maximum_rate"
+            ],
+            soil_production__decay_depth=weathering_params[
+                "soil_production__decay_depth"
+            ],
+        )
 
         #   precipitation
 
@@ -219,6 +257,7 @@ class VolcanicIslandSimulator:
         # Update tectonics and/or sea level
         self.change_sea_level()
         self.apply_tectonics(dt)
+
         # Set boundaries for subaerial processes: all interior submarine nodes
         # flagged as FIXED_VALUE
         under_water = np.logical_and(
@@ -228,6 +267,8 @@ class VolcanicIslandSimulator:
         self.grid.status_at_node[under_water] = self.grid.BC_NODE_IS_FIXED_VALUE
 
         # Apply weathering and hillslope transport
+        self.weatherer.calc_soil_prod_rate()
+        self.creeper.run_one_step(dt)
 
         # Update precipitation
 
@@ -266,7 +307,7 @@ class VolcanicIslandSimulator:
                 self.next_output -= self.output_interval
 
     def plot_elevation(self):
-        imshow_grid(self.mg, self.z)
+        imshow_grid(self.grid, self.topo)
         plt.show()
 
     def change_sea_level(self):
@@ -275,7 +316,6 @@ class VolcanicIslandSimulator:
         self.sea_level = self.sea_level_mean + (self.sea_level_amplitude / 2) * np.sin(
             2 * np.pi * time / (self.sea_level_period)
         )
-        pass
 
     def apply_tectonics(self, dt):
         """update base level based on simple releative uplift/subsidence rate"""
